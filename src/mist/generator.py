@@ -41,15 +41,6 @@ CJK_CHAR_STOPWORDS = frozenset(
     "只未免去即则虽若让又才且但所由被将使其兹兮焉哉矣耳"
 )
 
-CJK_PHRASE_STOPWORDS = frozenset(
-    {
-        "一个", "我们", "你们", "他们", "可以", "什么", "怎么", "为了", "以及",
-        "然后", "但是", "因为", "所以", "如果", "通过", "进行", "使用", "需要",
-        "具有", "这些", "那些", "这个", "那个", "并且", "或者", "能够", "一定",
-        "一种", "十分", "本身", "因此", "要求", "因此", "从而", "以便", "除非",
-    }
-)
-
 LATIN_RE = re.compile(r"[a-z0-9_]+")
 CJK_RE = re.compile(r"[一-鿿]+")
 
@@ -71,9 +62,9 @@ def normalize(text: str) -> str:
 
 
 def is_stopword(token: str) -> bool:
-    if token in CJK_PHRASE_STOPWORDS or token in LATIN_STOPWORDS:
+    if token in LATIN_STOPWORDS:
         return True
-    return len(token) == 1 and (token in CJK_CHAR_STOPWORDS or token in LATIN_STOPWORDS)
+    return len(token) == 1 and token in CJK_CHAR_STOPWORDS
 
 
 def tokenize(text: str) -> list[str]:

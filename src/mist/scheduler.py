@@ -54,13 +54,16 @@ class Schedule:
 
 
 def validate_rating(rating: int) -> int:
-    try:
-        value = int(rating)
-    except (TypeError, ValueError) as exc:
-        raise InvalidRating(f"评分必须是 0-5 的整数，收到 {rating!r}") from exc
-    if not 0 <= value <= 5:
-        raise InvalidRating(f"评分必须在 0-5 之间，收到 {value}")
-    return value
+    """Accept whole numbers only: a silently truncated rating would rewrite the schedule.
+
+    ``int(2.5) == 2`` is exactly the fuzz this scheduler must not absorb, and
+    ``bool`` is an ``int`` subclass in Python, so both are rejected explicitly.
+    """
+    if isinstance(rating, bool) or not isinstance(rating, int):
+        raise InvalidRating(f"评分必须是 0-5 的整数，收到 {rating!r}")
+    if not 0 <= rating <= 5:
+        raise InvalidRating(f"评分必须在 0-5 之间，收到 {rating}")
+    return rating
 
 
 def next_ease(ease: float, rating: int) -> float:
