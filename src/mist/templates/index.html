@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>认知天性 · 学习训练器</title>
+<style>
+  :root { --bg:#12161d; --fg:#e8edf4; --dim:#8b97a8; --accent:#5cc8ff; --warn:#ffb86b; --line:#25303e; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.65 -apple-system,"Segoe UI","Microsoft YaHei",sans-serif; }
+  main { max-width:820px; margin:0 auto; padding:20px 16px 60px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--dim); font-size:13px; margin-bottom:16px; }
+  nav { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+  nav button, .btn { background:#1b232d; color:var(--fg); border:1px solid var(--line); border-radius:8px;
+    padding:8px 14px; cursor:pointer; font-size:14px; }
+  nav button.on { border-color:var(--accent); color:var(--accent); }
+  .card { border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:14px; background:#161c25; }
+  .q { font-size:18px; font-weight:600; margin:0 0 10px; }
+  .meta { color:var(--dim); font-size:12px; }
+  textarea, input[type=text] { width:100%; background:#0f141b; color:var(--fg); border:1px solid var(--line);
+    border-radius:8px; padding:10px; font:inherit; }
+  textarea { min-height:110px; resize:vertical; }
+  .ref { white-space:pre-wrap; border-left:3px solid var(--accent); padding:8px 12px; background:#0f141b; border-radius:0 8px 8px 0; }
+  .rates { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .rates button { flex:1 1 60px; padding:10px 0; border-radius:8px; border:1px solid var(--line); background:#1b232d; color:var(--fg); cursor:pointer; }
+  .rates button:hover { border-color:var(--accent); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; }
+  th { color:var(--dim); font-weight:500; }
+  .bar { height:8px; background:var(--accent); border-radius:4px; display:inline-block; vertical-align:middle; }
+  .hide { display:none; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:999px; background:#1b232d; border:1px solid var(--line); font-size:12px; color:var(--dim); }
+  label { display:block; margin:12px 0 4px; color:var(--dim); font-size:13px; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>认知天性 · 学习训练器</h1>
+  <div class="sub">先自己生成答案，再看参考答案并自评 —— 检索练习、间隔重复、交错练习、反思。</div>
+  <nav>
+    <button data-tab="review" class="on">复习</button>
+    <button data-tab="stats">统计</button>
+    <button data-tab="add">添加卡片</button>
+  </nav>
+
+  <section id="tab-review">
+    <div class="card" id="queue-info">载入队列中……</div>
+    <div id="stage"></div>
+  </section>
+
+  <section id="tab-stats" class="hide">
+    <div class="card"><div id="health" class="q"></div><div id="overview" class="meta"></div></div>
+    <div class="card"><table id="topic-table"></table></div>
+    <div class="card"><div class="meta">最近复习次数</div><table id="trend-table"></table></div>
+  </section>
+
+  <section id="tab-add" class="hide">
+    <form class="card" id="add-form">
+      <label>主题<input type="text" name="topic" required placeholder="例如：检索练习"></label>
+      <label>问题<input type="text" name="question" required placeholder="要能触发回忆的问题"></label>
+      <label>参考答案<textarea name="answer" required placeholder="用自己的话写清关键要点，覆盖率评分从这里提取关键词"></textarea></label>
+      <label>标签（逗号分隔）<input type="text" name="tags" placeholder="概念,案例"></label>
+      <label>来源<input type="text" name="source" placeholder="第 2 章 / 讲义 p.12"></label>
+      <label>难度 1-5<input type="text" name="difficulty" value="3"></label>
+      <p><button class="btn" type="submit">保存卡片</button> <span id="add-msg" class="meta"></span></p>
+    </form>
+  </section>
+</main>
+
+<script>
+const stage = document.getElementById('stage');
+const info = document.getElementById('queue-info');
+let queue = [], index = 0, sessionId = '';
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  ['review','stats','add'].forEach(t => document.getElementById('tab-' + t)
+      .classList.toggle('hide', t !== b.dataset.tab));
+  if (b.dataset.tab === 'stats') loadStats();
+});
+
+async function jget(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error((await r.text()).slice(0, 200) || r.status);
+  return r.json();
+}
+
+async function loadQueue() {
+  const data = await jget('/api/queue?limit=20&new_limit=10');
+  queue = data.cards; index = 0; sessionId = data.session_id;
+  info.innerHTML = `<b>${data.summary}</b><br><span class="meta">${data.note || ''}</span>` +
+    (data.weak_topics?.length ? `<br><span class="meta">薄弱主题加权：${data.weak_topics.join('、')}</span>` : '');
+  render();
+}
+
+function esc(s) { return (s || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+function render() {
+  if (!queue.length) { stage.innerHTML = '<div class="card">今天没有到期卡片。不要预习式重读资料，等到期再做检索练习。</div>'; return; }
+  if (index >= queue.length) { renderReflect(); return; }
+  const c = queue[index];
+  stage.innerHTML = `<div class="card">
+    <div class="meta">第 ${index + 1}/${queue.length} 题　主题：${esc(c.topic)}　难度：${c.difficulty}
+      ${c.tags?.length ? '　标签：' + c.tags.map(esc).join(',') : ''}　<span class="pill">${c.mastery}</span></div>
+    <p class="q">${esc(c.question)}</p>
+    <textarea id="ans" placeholder="先合上资料，用自己的话写关键词、因果链、例子。"></textarea>
+    <p><button class="btn" id="check">提交并看参考答案</button>
+      <button class="btn" id="skip">跳过（仍留在到期队列）</button></p>
+    <div id="reveal"></div></div>`;
+  document.getElementById('check').onclick = check;
+  document.getElementById('skip').onclick = () => { index++; render(); };
+}
+
+async function check() {
+  const c = queue[index];
+  const text = document.getElementById('ans').value;
+  const res = await jget('/api/check', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ card_id: c.id, user_answer: text }) });
+  const cov = res.coverage;
+  document.getElementById('reveal').innerHTML = `<div class="ref">${esc(res.answer)}</div>
+    <p><b>关键词覆盖率 ${cov.percent}%</b> · ${cov.label}
+      ${cov.missing?.length ? `<br><span class="meta">未覆盖：${cov.missing.map(esc).join('、')}</span>` : ''}</p>
+    <p class="meta">细化建议：${esc(res.hint)}</p>
+    <div class="meta">自评 0-5（诚实打分：5 = 流畅且能迁移，0 = 完全想不起来）</div>
+    <div class="rates">${[0,1,2,3,4,5].map(n => `<button data-r="${n}">${n}</button>`).join('')}</div>`;
+  document.querySelectorAll('.rates button').forEach(b => b.onclick = () => grade(c, text, +b.dataset.r, cov));
+}
+
+async function grade(c, text, rating, cov) {
+  const r = await jget('/api/grade', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ card_id: c.id, rating, user_answer: text, coverage_summary: cov.summary || '', session_id: sessionId }) });
+  info.innerHTML += `<br><span class="meta">#${c.id} → 间隔 ${r.interval} 天，ease ${r.ease}，${esc(r.mastery)}</span>`;
+  index++; render();
+}
+
+function renderReflect() {
+  stage.innerHTML = `<div class="card"><p class="q">复习结束 · 反思与细化</p>
+    <label>今天最核心的概念是什么？<textarea id="r1"></textarea></label>
+    <label>它和你已知的什么有联系？<textarea id="r2"></textarea></label>
+    <label>下次练习你会怎么改进？<textarea id="r3"></textarea></label>
+    <p><button class="btn" id="save">保存反思</button> <span id="rmsg" class="meta"></span></p></div>`;
+  document.getElementById('save').onclick = async () => {
+    await jget('/api/reflect', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ session_id: sessionId, core_concept: r1.value, connection: r2.value, next_improvement: r3.value }) });
+      document.getElementById('rmsg').textContent = '已保存。';
+      setTimeout(loadQueue, 600);
+  };
+}
+
+async function loadStats() {
+  const s = await jget('/api/stats');
+  document.getElementById('health').textContent = s.health_line;
+  const m = s.mastery || {};
+  document.getElementById('overview').innerHTML =
+    `已掌握 ${m['已掌握'] || 0} · 巩固中 ${m['巩固中'] || 0} · 学习中 ${m['学习中'] || 0} · 新卡片 ${m['新卡片'] || 0}
+     <br>连续复习 ${s.streak_days} 天 · 期间复习 ${s.recent_total} 次 · 反思 ${s.reflections_total} 篇` +
+    (s.weakest?.length ? `<br>薄弱 Top5：${s.weakest.map(w => esc(w[0]) + ' ' + w[1].toFixed(2)).join('、')}` : '');
+  const topics = await jget('/api/topics');
+  document.getElementById('topic-table').innerHTML =
+    '<tr><th>主题</th><th>卡片</th><th>薄弱指数</th><th>说明</th></tr>' +
+    topics.map(t => `<tr><td>${esc(t.name)}</td><td>${t.cards}</td><td>${t.weakness.toFixed(2)}</td>
+      <td class="meta">${esc(t.description || '')}</td></tr>`).join('');
+  const max = Math.max(...(s.recent_days || [[0,0]].map(d => d[1])), 1);
+  document.getElementById('trend-table').innerHTML = (s.recent_days || [])
+    .map(d => `<tr><td>${d[0]}</td><td><span class="bar" style="width:${Math.round(60 * d[1] / max)}px"></span> ${d[1]}</td></tr>`)
+    .join('');
+}
+
+document.getElementById('add-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const body = Object.fromEntries(f.entries());
+  body.difficulty = +body.difficulty || 3;
+  try {
+    const c = await jget('/api/cards', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    document.getElementById('add-msg').textContent = `已保存 #${c.id}，今天就会出现在队列里。`;
+    e.target.reset();
+  } catch (err) { document.getElementById('add-msg').textContent = '失败：' + err.message; }
+};
+
+if (location.protocol === 'file:') {
+  info.innerHTML = '这是直接双击打开的静态文件，浏览器不允许它访问后端。<br>'
+    + '请在项目目录运行 <code>mist web</code>，然后打开 <code>http://127.0.0.1:8000</code>。';
+} else {
+  loadQueue().catch(e => {
+    info.innerHTML = '加载失败：' + esc(e.message)
+      + '<br><span class="meta">确认服务在跑：mist web --port 8000（页面需通过 http:// 打开，不能双击 html）</span>';
+  });
+}
+</script>
+</body>
+</html>

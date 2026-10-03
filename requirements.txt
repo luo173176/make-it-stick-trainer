@@ -1,0 +1,10 @@
+# 运行时依赖（CLI）
+SQLAlchemy>=2.0
+rich>=13.0
+
+# 测试
+pytest>=8.0
+
+# 可选：mist web
+fastapi>=0.110
+uvicorn>=0.27

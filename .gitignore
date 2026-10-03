@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.Python
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# 数据与备份
+*.db
+*.db-journal
+*.sqlite3
+mist.db
+backup.json
+export.json
+
+# 测试与工具缓存
+.pytest_cache/
+.mist/
+.coverage
+htmlcov/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+.DS_Store
