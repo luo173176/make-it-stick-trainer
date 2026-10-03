@@ -6,7 +6,10 @@
  * shell until the browser decides to evict it.
  */
 
-const CACHE = "mist-v1";
+const CACHE = "mist-v2";
+// sw.js is deliberately absent: the browser fetches the worker script outside
+// this cache, so precaching it wastes quota and makes "is everything cached?"
+// checks read as failures.
 const SHELL = [
   "./",
   "./index.html",

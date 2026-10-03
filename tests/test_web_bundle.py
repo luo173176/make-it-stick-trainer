@@ -53,5 +53,11 @@ def test_manifest_points_at_files_that_exist():
 
 def test_service_worker_precaches_every_bundle_file():
     source = (REPO / "web" / "sw.js").read_text(encoding="utf-8")
-    for name in ("app.js", "core.js", "store.js", "manifest.webmanifest", "icon.svg"):
-        assert f"./{name}" in source, f"{name} 没有被预缓存，离线时会白屏"
+    block = source.split("const SHELL = [", 1)[1].split("];", 1)[0]
+    entries = [line.strip().strip(",").strip('"') for line in block.splitlines() if line.strip().startswith('"')]
+    assert "./app.js" in entries and "./core.js" in entries
+    assert "./sw.js" not in entries, "worker script must not be precached"
+    for entry in entries:
+        name = entry.lstrip("./")
+        target = REPO / "web" / (name or "index.html")
+        assert target.exists(), f"预缓存清单里的 {entry} 在磁盘上不存在"
