@@ -43,6 +43,9 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install runtime deps
+        run: pip install -e .
+
       - name: Regenerate behavior vectors from Python
         run: python tests/make_behavior_vectors.py
 
