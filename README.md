@@ -1,5 +1,7 @@
 # make-it-stick-trainer（认知天性学习策略训练器）
 
+[![CI](https://github.com/luo173176/make-it-stick-trainer/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/luo173176/make-it-stick-trainer/actions/workflows/ci.yml)
+
 一个把《认知天性：让学习轻而易举的心理学规律》（*Make It Stick*）里的学习规律**做成可执行流程**的训练器。
 你只需要输入正在学的内容，它负责：**先逼你回忆，再打乱主题，再拉开复习间隔，最后让你写反思并校准掌握度。**
 
@@ -239,11 +241,11 @@ Web 与 CLI 共用同一个 SQLite 文件和同一套调度代码，因此两边
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # 46 个用例
+pytest                 # 74 个用例
 pytest -q tests/test_scheduler.py tests/test_interleaver.py
 ```
 
-覆盖面：SM-2 的重置/阶梯增长/ease 下限 1.3、交错队列的主题连续数与到期优先与新卡上限、关键词覆盖率与停用词、以及 CLI 端到端（`init/add/import/stats/export/import/review/reflect`，含用管道输入驱动的交互复习）。
+覆盖面：SM-2 的重置/阶梯增长/ease 下限 1.3、交错队列的主题连续数与到期优先与新卡上限、内容覆盖率与打乱字序的反作弊、CLI 端到端（`init/add/import/stats/export/import/review/reflect`，含用管道输入驱动的交互复习），以及 Web 的 HTTP 契约（请求体绑定、复习写库、404/422 分支）。
 
 ---
 
