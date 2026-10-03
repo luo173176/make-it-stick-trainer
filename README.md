@@ -28,6 +28,8 @@
 
 ## 2. 安装
 
+> 只想在手机上用：不用装任何东西，直接打开 <https://luo173176.github.io/make-it-stick-trainer/> 并「添加到主屏幕」（见 §7.1）。下面是在电脑上跑 CLI 的步骤。
+
 要求 Python 3.11+。
 
 ```bash
@@ -226,14 +228,33 @@ ratio = ( 内容字覆盖率 + 相邻字对顺序覆盖率 ) / 2
 
 ---
 
-## 7. Web 界面（可选）
+## 7. 两个界面：本机 Web 与手机 PWA
 
-`mist web` 起 FastAPI + 一个 `src/mist/templates/index.html`（原生 fetch，无构建工具）：
+| | 本机 Web（`mist web`） | 手机 PWA（`web/`） |
+| --- | --- | --- |
+| 入口 | `http://127.0.0.1:8000` | GitHub Pages 链接，或本地 `python -m http.server --directory web` |
+| 后端 | FastAPI，读写 `mist.db` | **无**，Service Worker 全离线 |
+| 存储 | SQLite，与 CLI 同一份文件 | 浏览器 IndexedDB，**只在这台手机上** |
+| 算法 | `src/mist/*.py` | `web/core.js`（同一套规则的第二次实现） |
+| 功能 | 复习/统计/加卡片 | 复习/统计/加卡片/反思/导出导入/示例数据 |
 
-- `/` 三块：复习（先写答案 → 看参考答案与覆盖率 → 点 0-5 自评）、统计、添加卡片；
-- `/api/queue`、`/api/check`、`/api/grade`、`/api/reflect`、`/api/stats`、`/api/topics`、`/api/cards`。
+### 7.1 手机 PWA
 
-Web 与 CLI 共用同一个 SQLite 文件和同一套调度代码，因此两边进度互通；**CLI 才是功能完整的参考实现**。
+打开 <https://luo173176.github.io/make-it-stick-trainer/> → 浏览器菜单**「添加到主屏幕」**→ 之后从图标启动。
+
+- 完全离线可用，第一次加载后不需要网络；
+- 复习流程与 CLI 一致：只出题 → 自己写答案 → 才给参考答案与覆盖率 → 自评 0-5 → SM-2 排期；
+- 队列同样按主题交错、薄弱主题加权、新卡限量；
+- 「数据」页导出/导入 JSON，是唯一的迁移手段。
+
+**必须知道的两件事**
+
+1. 手机数据与电脑上的 `mist.db` **不互通**（这是"不需要同步"的代价）。想合并到电脑：手机导出 → 电脑 `mist import --file 备份.json`（导入会还原 `ease/interval/repetitions/lapses/due_date` 与复习历史）。
+2. iOS Safari 对**没有添加到主屏幕**的网页，可能在 7 天未访问后清掉本地存储。从主屏幕图标启动会以独立来源运行，持久性显著更好。**无论如何请定期导出。**
+
+### 7.2 本机 Web
+
+`mist web` 起 FastAPI + 一个 `src/mist/templates/index.html`（原生 fetch，无构建工具）：`/api/queue`、`/api/check`、`/api/grade`、`/api/reflect`、`/api/stats`、`/api/topics`、`/api/cards`。它与 CLI 共用同一个 SQLite 文件，两边进度天然互通。**CLI 才是功能完整的参考实现。**
 
 ---
 
@@ -241,11 +262,25 @@ Web 与 CLI 共用同一个 SQLite 文件和同一套调度代码，因此两边
 
 ```bash
 pip install -e ".[dev]"
-pytest                 # 74 个用例
-pytest -q tests/test_scheduler.py tests/test_interleaver.py
+pytest                      # 96 个用例（Python）
+node --test web/test/core.test.mjs   # 14 个用例（JS 与 Python 的一致性）
 ```
 
-覆盖面：SM-2 的重置/阶梯增长/ease 下限 1.3、交错队列的主题连续数与到期优先与新卡上限、内容覆盖率与打乱字序的反作弊、CLI 端到端（`init/add/import/stats/export/import/review/reflect`，含用管道输入驱动的交互复习），以及 Web 的 HTTP 契约（请求体绑定、复习写库、404/422 分支）。
+覆盖面：SM-2 的重置/阶梯增长/ease 下限 1.3、交错队列的主题连续数与到期优先与新卡上限、内容覆盖率与打乱字序的反作弊、CLI 端到端（`init/add/import/stats/export/import/review/reflect`，含用管道输入驱动的交互复习）、本机 Web 的 HTTP 契约（请求体绑定、复习写库、404/422 分支）、手机包的文件完整性。
+
+### 8.1 两份实现怎么保证一致
+
+手机上的 `web/core.js` 是 SM-2 / 交错 / 覆盖率的**第二次实现**，靠人眼对齐必然漂移，所以有一份契约文件：
+
+```
+src/mist/*.py  ──生成──▶  tests/vectors/behavior.json  ──断言──▶  web/core.js
+```
+
+- `python tests/make_behavior_vectors.py` 从 Python 参考实现导出行为向量（评分序列 → 间隔/ease/到期；队列输入 → 卡片顺序；参考答案+用户答案 → 覆盖率、标签、未覆盖片段；复习记录 → 薄弱指数、连续天数）。
+- `tests/test_behavior_vectors.py` 断言向量文件与当前 Python 实现一致（改了 Python 忘了重新生成就红）。
+- `web/test/core.test.mjs` 断言 JS 复现同一批结果（改了 JS 行为不一致就红）。
+- CI 的 `web-parity` 任务把三步串起来跑。
+- 唯一排除在外的：新卡组内的洗牌顺序（Python 用 MT19937，JS 用 mulberry32）。它只打乱同一主题内部的顺序，不影响交错不变量，所以断言的是"同主题不连续超过 2 张"等性质，而不是具体次序。
 
 ---
 
@@ -264,7 +299,16 @@ make-it-stick-trainer/
 │   ├── stats.py         # 统计计算与 Rich 渲染
 │   ├── web.py           # 可选 FastAPI
 │   └── templates/index.html
-├── tests/               # pytest
+├── tests/               # pytest + 行为向量契约
+│   └── vectors/behavior.json   # 由 Python 生成、被 JS 断言的共享契约
+├── web/                 # 手机 PWA（纯静态，GitHub Pages 直接托管）
+│   ├── index.html       # 窄屏界面（390px 实测无横向溢出，触控目标 ≥44px）
+│   ├── app.js           # 视图与交互
+│   ├── core.js          # SM-2 / 交错 / 覆盖率的第二次实现
+│   ├── store.js         # IndexedDB
+│   ├── sw.js            # 离线缓存
+│   └── test/core.test.mjs   # node --test
+├── .github/workflows/   # ci.yml（矩阵 + 一致性）、pages.yml（部署手机包）
 ├── examples/seed.json   # 12 张示例卡片（内容就是本书结论）
 ├── pyproject.toml       # mist 入口、依赖、可选 [web]/[dev]
 └── requirements.txt
@@ -282,6 +326,8 @@ make-it-stick-trainer/
 
 ## 11. 已知限制
 
+- 手机 PWA 与电脑 `mist.db` **不互通**，且算法是两份实现（靠行为向量对齐，见 §8.1）。改算法要同时改两边并重新生成向量。
+- 手机数据存在浏览器里：清缓存、卸载浏览器、iOS 长期不用都可能丢失，只有导出 JSON 是保险。
 - 中文没有分词器，覆盖率基于**内容字 + 相邻字对**两个视图；"未覆盖"清单是从参考答案切出的近似片段，可能从词中间断开（`但提取路径没`）。把参考答案写短、用 `--tags` 标出术语能改善。
 - 无图片/公式支持，无 reminders、无云端同步；单文件 SQLite，多设备请自己同步文件或走 `export/import`。
 - 并发写入依赖 SQLite 默认行为，不适合多人共享库（Web 版仅供单人本机使用，默认绑定 `127.0.0.1`）。
@@ -290,8 +336,8 @@ make-it-stick-trainer/
 
 1. Fork 仓库，建分支：`git checkout -b feature/short-name`
 2. 安装开发环境：`pip install -e ".[dev]"`
-3. 改动算法时**先加测试**（`tests/test_scheduler.py`、`tests/test_interleaver.py` 是分层的边界用例）
-4. `pytest` 必须全绿；文档里受影响的地方一并更新
+3. 改动算法时**先加测试**（`tests/test_scheduler.py`、`tests/test_interleaver.py` 是分层的边界用例）；若改的是 `src/mist` 里的规则，还要 `python tests/make_behavior_vectors.py` 重新生成向量，并让 `node --test web/test/core.test.mjs` 通过 —— 手机端的 `web/core.js` 必须跟着改，否则 CI 的 `web-parity` 任务会红
+4. `pytest` 与 `node --test` 必须全绿；文档里受影响的地方一并更新
 5. 提 PR，说明它对应《认知天性》里的哪条规律、以及为什么这样映射
 
 欢迎的方向：中文分词改用词典/`jieba`、`evaluate_with_llm` 的真实实现、卡片富文本/图片、更多调度算法（FSRS）、导出 Anki/CSV、i18n。

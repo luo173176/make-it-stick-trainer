@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f141b">
+<meta name="apple-touch-web-app-title" content="认知天性">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>认知天性 · 训练器</title>
+<style>
+  :root {
+    --bg: #0f141b; --panel: #161d27; --line: #26313f; --fg: #e9eef5;
+    --dim: #8b98a9; --accent: #5cc8ff; --ok: #68d391; --warn: #f6c177; --bad: #fc8181;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 17px/1.6 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+  main { max-width: 640px; margin: 0 auto; padding: 14px 14px 0; }
+  header { display: flex; align-items: baseline; gap: 8px; margin: 4px 0 12px; }
+  header h1 { font-size: 19px; margin: 0; }
+  header .tag { color: var(--dim); font-size: 12px; }
+  section { display: none; }
+  section.on { display: block; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+  .q { font-size: 20px; font-weight: 600; line-height: 1.5; margin: 6px 0 10px; }
+  .meta { color: var(--dim); font-size: 13px; }
+  textarea, input[type=text], input[type=number], select {
+    width: 100%; background: #0c1117; color: var(--fg); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px; font: inherit; font-size: 17px; /* >=16px stops iOS zoom-on-focus */
+  }
+  textarea { min-height: 132px; resize: vertical; }
+  label { display: block; margin: 12px 0 4px; color: var(--dim); font-size: 13px; }
+  button {
+    min-height: 48px; padding: 12px 16px; font: inherit; font-size: 16px; border-radius: 12px;
+    border: 1px solid var(--line); background: #1c2531; color: var(--fg); cursor: pointer;
+  }
+  button.primary { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  button:active { transform: scale(0.985); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 0; min-width: 0; }
+  .rates { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-top: 10px; }
+  .rates button { padding: 14px 0; font-size: 18px; font-weight: 600; }
+  .ref { white-space: pre-wrap; border-left: 3px solid var(--accent); background: #0c1117;
+    padding: 10px 12px; border-radius: 0 10px 10px 0; margin: 10px 0; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line);
+    font-size: 12px; color: var(--dim); margin: 0 4px 4px 0; }
+  .bar { height: 10px; border-radius: 5px; background: var(--accent); display: inline-block; vertical-align: middle; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { border-bottom: 1px solid var(--line); padding: 8px 6px; text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 500; font-size: 12px; }
+  td.num, th.num { text-align: right; }
+  nav {
+    position: fixed; left: 0; right: 0; bottom: 0; display: flex;
+    background: rgba(18, 24, 32, 0.97); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom); backdrop-filter: blur(6px);
+  }
+  nav button {
+    flex: 1; min-height: 60px; border: 0; border-radius: 0; background: transparent;
+    color: var(--dim); font-size: 13px; display: flex; flex-direction: column; gap: 2px;
+    align-items: center; justify-content: center;
+  }
+  nav button .ico { font-size: 20px; line-height: 1; }
+  nav button.on { color: var(--accent); }
+  .badge { background: var(--accent); color: #081018; border-radius: 999px; padding: 0 6px; font-size: 11px; font-weight: 700; }
+  .good { color: var(--ok); } .mid { color: var(--warn); } .poor { color: var(--bad); }
+  .hide { display: none !important; }
+  .note { font-size: 13px; color: var(--dim); }
+  h2 { font-size: 16px; margin: 18px 0 8px; }
+  h2:first-child { margin-top: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>认知天性 · 训练器</h1>
+    <span class="tag">先回忆，再对照</span>
+  </header>
+
+  <section id="tab-review" class="on">
+    <div class="card" id="queue-head">载入中……</div>
+    <div id="stage"></div>
+  </section>
+
+  <section id="tab-add">
+    <form class="card" id="add-form" autocomplete="off">
+      <label>主题<input type="text" name="topic" required list="topic-list" placeholder="例如：检索练习"></label>
+      <datalist id="topic-list"></datalist>
+      <label>问题<input type="text" name="question" required placeholder="要能触发回忆的问题"></label>
+      <label>参考答案<textarea name="answer" required placeholder="用自己的话写清要点，覆盖率从这里取内容字"></textarea></label>
+      <label>标签（逗号分隔）<input type="text" name="tags" placeholder="概念,案例"></label>
+      <label>来源<input type="text" name="source" placeholder="第 2 章 / 讲义 p.12"></label>
+      <label>难度 1-5<input type="number" name="difficulty" value="3" min="1" max="5" inputmode="numeric"></label>
+      <p class="row"><button class="primary" type="submit">保存卡片</button></p>
+      <p class="note" id="add-msg"></p>
+    </form>
+    <div class="card">
+      <h2>还没有内容？</h2>
+      <p class="note">导入 12 张示例卡片（内容就是《认知天性》的结论），先跑一轮感受流程。</p>
+      <p class="row"><button id="load-seed" type="button">导入示例卡片</button></p>
+    </div>
+  </section>
+
+  <section id="tab-stats">
+    <div class="card"><div class="q" id="s-health" style="font-size:17px"></div><div class="meta" id="s-overview"></div></div>
+    <div class="card"><h2>各主题</h2><table id="s-topics"></table></div>
+    <div class="card"><h2>最近 7 天复习</h2><table id="s-trend"></table></div>
+    <div class="card"><h2>薄弱主题</h2><div id="s-weak" class="note"></div></div>
+    <div class="card"><h2>最近的反思</h2><div id="s-reflect" class="note"></div></div>
+  </section>
+
+  <section id="tab-data">
+    <div class="card">
+      <h2>备份</h2>
+      <p class="note">数据只存在这台手机的浏览器里。清缓存或卸载浏览器会一起丢掉，请定期导出。</p>
+      <p class="row">
+        <button id="export-json" class="primary" type="button">导出 JSON</button>
+        <button id="copy-json" type="button">复制到剪贴板</button>
+      </p>
+      <p class="note" id="data-msg"></p>
+    </div>
+    <div class="card">
+      <h2>恢复</h2>
+      <p class="note">导入会<b>覆盖</b>当前手机上的全部数据。</p>
+      <p class="row"><button type="button" id="import-btn">选择备份文件</button></p>
+      <input type="file" id="import-file" accept="application/json,.json" class="hide">
+    </div>
+    <div class="card">
+      <h2>清空</h2>
+      <p class="row"><button type="button" id="wipe-btn">删除本机全部数据</button></p>
+    </div>
+    <div class="card">
+      <h2>关于</h2>
+      <p class="note">离线可用；复习进度、间隔与自评都存在本地，不上传任何服务器。<br>
+      算法与 CLI 版共用同一套行为向量测试，保证两边排期一致。</p>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-tab="review" class="on"><span class="ico">◷</span>复习<span id="nav-count"></span></button>
+  <button data-tab="add"><span class="ico">＋</span>添加</button>
+  <button data-tab="stats"><span class="ico">▤</span>统计</button>
+  <button data-tab="data"><span class="ico"></span>数据</button>
+</nav>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

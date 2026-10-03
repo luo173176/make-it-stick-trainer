@@ -1,0 +1,17 @@
+{
+  "name": "认知天性学习训练器",
+  "short_name": "认知天性",
+  "description": "检索练习 + 间隔重复 + 交错队列 + 生成性自评 + 反思，数据只存在本机。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f141b",
+  "theme_color": "#0f141b",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

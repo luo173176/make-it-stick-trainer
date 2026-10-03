@@ -27,3 +27,27 @@ jobs:
 
       - name: Test
         run: pytest -q
+
+  # The phone build is a second implementation of the same rules; this job
+  # fails if it drifts from the vectors generated out of the Python code.
+  web-parity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Regenerate behavior vectors from Python
+        run: python tests/make_behavior_vectors.py
+
+      - name: Vectors must match the committed contract
+        run: git diff --exit-code tests/vectors/behavior.json
+
+      - name: JS must reproduce the vectors
+        run: node --test web/test/core.test.mjs
