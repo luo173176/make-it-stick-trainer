@@ -17,7 +17,9 @@ dependencies = [
 
 [project.optional-dependencies]
 web = ["fastapi>=0.110", "uvicorn>=0.27"]
-dev = ["pytest>=8.0"]
+# httpx2 is what starlette's TestClient imports on recent releases, httpx on
+# older ones; tests skip themselves if neither is present.
+dev = ["pytest>=8.0", "httpx2>=2.0", "httpx>=0.27"]
 
 [project.scripts]
 mist = "mist.cli:main"

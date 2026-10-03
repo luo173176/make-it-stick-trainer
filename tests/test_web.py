@@ -16,7 +16,12 @@ from mist.models import Card, Reflection, Review, Topic, utcnow
 from mist.web import create_app
 
 pytest.importorskip("fastapi", reason="pip install -e '.[web]'")
-from fastapi.testclient import TestClient  # noqa: E402
+try:
+    # Starlette raises RuntimeError (not ImportError) when no HTTP client backend
+    # is installed, so a bare importorskip would take the whole suite down.
+    from fastapi.testclient import TestClient
+except (ImportError, RuntimeError) as exc:  # pragma: no cover - depends on extras
+    pytest.skip(f"TestClient 需要 httpx2/httpx：pip install -e '.[dev]'（{exc}）", allow_module_level=True)
 
 
 @pytest.fixture
